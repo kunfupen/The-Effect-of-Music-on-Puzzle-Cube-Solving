@@ -1,0 +1,198 @@
+---
+title: "306281422_stats101b_project"
+author: "Francis Chan"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r}
+library(readr)
+library(tidyr)
+library(ggplot2)
+library(dplyr)
+library(cowplot)
+library(knitr)
+library(texreg)
+```
+
+```{r}
+data <- read_csv("~/Desktop/STATS 101B/Project/music_puzzle_solving.csv")
+
+# Convert factors to factor data type
+data$Sequence <- as.factor(data$Sequence)
+data$Subject <- as.factor(data$Subject)
+
+cleaned_data <- data %>% 
+  pivot_longer(cols = 4:6, names_to = "Type", names_prefix = "Time", values_to = "Time Taken")
+
+cleaned_data[1:36,"Type"] <- rep(c("Control", "Classical", "Heavy Metal"),12)
+cleaned_data[37:72, "Type"] <- rep(c("Classical", "Heavy Metal", "Control"),12)
+cleaned_data[73:108, "Type"] <- rep(c("Heavy Metal", "Control", "Classical"),12)
+
+subject <- cleaned_data$Subject
+gender <- cleaned_data$Gender
+sequence <- cleaned_data$Sequence
+music_type <- cleaned_data$Type
+time_taken <- cleaned_data$`Time Taken`
+```
+```{r}
+aov1 <- aov(`Time Taken` ~ Type + Sequence + Gender + Subject + Type*Sequence + Type*Gender + Gender*Sequence, data = cleaned_data)
+summary(aov1)
+```
+
+```{r}
+TukeyHSD(aov1)
+```
+
+```{r}
+male <- cleaned_data %>%
+  filter(Gender == "M")
+female <- cleaned_data %>%
+  filter(Gender == "F")
+
+male_plot <- ggplot() +
+  aes(x = male$Type, y = male$`Time Taken`, fill = male$Type) +
+  geom_boxplot(show.legend = FALSE) +
+  coord_cartesian(ylim = c(5,20)) +
+  labs(title = "Male", x = "Type", y = "Time Taken")
+
+female_plot <- ggplot() +
+  aes(x = female$Type, y = female$`Time Taken`, fill = female$Type) +
+  geom_boxplot(show.legend = FALSE) +
+  coord_cartesian(ylim = c(5,20)) + 
+   labs(title = "Female", x = "Type", y = "Time Taken")
+
+plot_grid(male_plot, female_plot)
+```
+
+```{r}
+male_seq <- ggplot() +
+  aes(x = male$Sequence, y = male$`Time Taken`, fill = male$Type) +
+  geom_boxplot(show.legend = FALSE) +
+  coord_cartesian(ylim = c(5,20)) +
+  labs(title = "Male", x = "Sequence", y = "Time Taken")
+
+female_seq <- ggplot() +
+  aes(x = female$Sequence, y = female$`Time Taken`, fill = female$Type) +
+  geom_boxplot(show.legend = FALSE) +
+  coord_cartesian(ylim = c(5,20)) + 
+   labs(title = "Female", x = "Sequence", y = "Time Taken")
+
+plot_grid(male_seq, female_seq)
+```
+
+
+
+```{r}
+ggplot() +
+  aes(x = cleaned_data$Sequence, y = cleaned_data$`Time Taken`, fill = cleaned_data$Sequence) +
+  geom_boxplot(show.legend = FALSE) +
+  coord_cartesian(ylim = c(5,20)) +
+  labs(x = "Sequence", y = "Time Taken")
+
+```
+```{r}
+ggplot() +
+  aes(x = cleaned_data$Sequence, y = cleaned_data$`Time Taken`, color = cleaned_data$Gender, group = cleaned_data$Gender) +
+   stat_summary(fun = "mean", geom = "point") +
+   stat_summary(fun = "mean", geom = "line") +
+   labs(title = "Interaction Plot", x = "Sequence", y = "Time Taken", color = "Gender")
+  
+```
+
+```{r}
+# Extract residuals and fitted values
+residuals <- residuals(aov1)
+fitted <- fitted(aov1)
+
+par(mfrow = c(2,2))
+# Plot Residuals vs. Fitted
+plot(fitted, residuals,
+     main = "Residuals vs Fitted",
+     xlab = "Fitted values",
+     ylab = "Residuals")
+abline(h = 0, col = "red")
+
+# Normal Q-Q Plot
+qqnorm(residuals)
+qqline(residuals, col = "red")
+
+# Scale-Location Plot (also known as Spread-Location plot)
+sqrt_abs_residuals <- sqrt(abs(residuals))
+plot(fitted, sqrt_abs_residuals,
+     main = "Scale-Location Plot",
+     xlab = "Fitted values",
+     ylab = "Square Root of |Residuals|")
+abline(h = 0, col = "red")
+
+# Residuals vs. Leverage
+plot(hatvalues(aov1), residuals,
+     main = "Residuals vs Leverage",
+     xlab = "Leverage",
+     ylab = "Residuals")
+abline(h = 0, col = "red")
+```
+```{r}
+par(mfrow = c(2,2))
+plot(aov1)
+```
+
+```{r}
+# Install and load cowplot if not already installed
+# install.packages("cowplot")
+library(cowplot)
+
+# Create individual plots
+type_sequence_plot <- ggplot(cleaned_data, aes(x = Type, y = `Time Taken`, color = Sequence, group = Sequence)) +
+  stat_summary(fun = "mean", geom = "point") +
+  stat_summary(fun = "mean", geom = "line") +
+  labs(title = "Interaction Plot: Type and Sequence",
+       x = "Type of Music",
+       y = "Time Taken",
+       color = "Sequence")
+
+type_gender_plot <- ggplot(cleaned_data, aes(x = Type, y = `Time Taken`, color = Gender, group = Gender)) +
+  stat_summary(fun = "mean", geom = "point") +
+  stat_summary(fun = "mean", geom = "line") +
+  labs(title = "Interaction Plot: Type and Gender",
+       x = "Type of Music",
+       y = "Time Taken",
+       color = "Gender")
+
+gender_sequence_plot <- ggplot(cleaned_data, aes(x = Sequence, y = `Time Taken`, color = Gender, group = Gender)) +
+  stat_summary(fun = "mean", geom = "point") +
+  stat_summary(fun = "mean", geom = "line") +
+  labs(title = "Interaction Plot: Gender and Sequence",
+       x = "Sequence",
+       y = "Time Taken",
+       color = "Gender")
+
+type_sequence_plot
+type_gender_plot
+gender_sequence_plot
+```
+```{r}
+# Generate Tukey HSD plots
+# Install and load multcomp if not already installed
+# install.packages("multcomp")
+library(multcomp)
+# Perform Tukey HSD test
+tukey_result <- TukeyHSD(aov1)
+
+# Plotting Tukey HSD results
+plot(tukey_result, las = 1) # las = 1 makes the labels horizontal
+
+# For a more customized plot using ggplot2
+tukey_df <- as.data.frame(tukey_result$Type)
+tukey_df$Comparison <- rownames(tukey_df)
+
+ggplot(tukey_df, aes(x = Comparison, y = diff)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = lwr, ymax = upr), width = 0.2) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(title = "Tukey HSD Test for Type", x = "Comparison", y = "Difference in Means") +
+  theme_minimal()
+```
+
